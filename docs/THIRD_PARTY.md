@@ -6,7 +6,7 @@
 |---|---|---|---|
 | P2Rank | 结合位点预测 | https://github.com/rdk/p2rank | 使用前核对官方许可证与引用 |
 | DoGSite3 / ProteinsPlus | 远程口袋预测 | https://proteins.plus/ | 受远程服务可用性和使用条款约束 |
-| fpocket | 几何口袋预测 | https://github.com/Discngine/fpocket | 在Linux/WSL/HPC独立安装 |
+| fpocket 4.2.3 (`4bb0d844…`) | 几何口袋预测 | https://github.com/Discngine/fpocket | 已用`scripts/bootstrap_fpocket_wsl.ps1`在隔离WSL2环境从官方源码编译；MIT许可证 |
 | DrugCLIP | 口袋—小分子检索 | https://github.com/bowen-gao/DrugCLIP | 源码与权重可能采用不同许可证 |
 | GNINA | 分子对接 | https://github.com/gnina/gnina | 后续Gate使用 |
 | SwissADME | 理化/药物相似性早筛 | https://www.swissadme.ch/ | 预测不是实验结论 |

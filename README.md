@@ -26,10 +26,10 @@
 - [x] 生成4个结构的P2Rank/DoGSite3双工具预检查：18/20、19/20、19/20、19/20
 - [x] 实现跨平台P2Rank安装器、fpocket运行器和三工具同结构共识生成器，并通过合成测试
 - [x] 记录突变位点的坐标可见性：8YFC的A1988V位点未出现在当前原子坐标中；9VMX的删除变体不能仅凭ATOM记录直接验证
-- [ ] 跑通 fpocket（当前 Windows 缺少 Linux/容器环境）
-- [ ] 在Linux/WSL/HPC获得真实fpocket结果后，对四个结构分别生成最终分层口袋
+- [x] 在独立WSL2环境编译安装fpocket 4.2.3，并跑通四个正式结构：294、246、246、246个fpocket候选口袋
+- [x] 分别生成四个结构的三工具最终共识：8YEZ为120个区域（T1=61、T2=59）；其余各121个（T1=64、T2=57）
 
-分类规则以 `config/consensus_rules.json` 为准。fpocket完成前，当前P2Rank/DoGSite3的18/20匹配只能称为预检查，不能提前标记T1。
+分类规则以 `config/consensus_rules.json` 为准。尚未完成fpocket的结构，其P2Rank/DoGSite3双工具匹配只能称为预检查，不能提前标记T1。
 - [x] 固定 DrugCLIP 官方源码版本和许可证
 - [ ] DrugCLIP 官方示例烟雾测试（需要 Linux/WSL/HPC、checkpoint 和 Uni-Core 环境）
 - [ ] GNINA 小规模 docking
@@ -71,6 +71,14 @@ python scripts/09_build_consensus.py --pdb-id 8YEZ --allow-partial
 python scripts/run_fpocket.py --pdb-id 8YEZ
 python scripts/09_build_consensus.py --pdb-id 8YEZ
 ```
+
+Windows 电脑可使用仓库内的一键 WSL 安装器。首次启用 WSL 后需要重启一次；重启后在 PowerShell 中运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/bootstrap_fpocket_wsl.ps1 -PdbId 8YEZ
+```
+
+该脚本会校验 Ubuntu 24.04.4 官方镜像的 SHA-256，在隔离的 `Ubuntu-fpocket` 发行版中按官方依赖串行编译固定版本 fpocket 4.2.3（其内置 Qhull 构建规则不适合干净环境并行编译），随后运行 `8YEZ` 并生成三工具共识。Ubuntu 镜像和 WSL 虚拟磁盘位于被 Git 忽略的 `tools/wsl/`，不会上传到仓库。只安装、不运行结构时加 `-SkipRun`。
 
 如果fpocket由另一台机器运行，可传入其完整输出目录：
 

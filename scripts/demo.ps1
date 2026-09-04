@@ -49,10 +49,25 @@ $DogSiteResult = Get-Content -Raw -LiteralPath "runs\dogsite3\${PdbId}\$($Latest
 Write-Host "Selected conformation: $PdbId"
 Write-Host "P2Rank pockets: $($P2RankPredictions.Count)"
 Write-Host "DoGSite3 pockets: $($DogSiteResult.residues.Count)"
-Write-Host "Tools completed: 2/3 (P2Rank + DoGSite3)" -ForegroundColor Yellow
 Write-Host "Preliminary pairwise support among P2Rank top 20: $Supported/20"
-Write-Host "Third tool fpocket: PENDING" -ForegroundColor Red
-Write-Host "Final T1/T2 classification: NOT GENERATED" -ForegroundColor Red
+$FpocketLatestPath = "runs\fpocket\${PdbId}\latest_run.json"
+if (Test-Path -LiteralPath $FpocketLatestPath) {
+    & $Python scripts\09_build_consensus.py --pdb-id $PdbId
+    if ($LASTEXITCODE -ne 0) { throw "Three-tool consensus generation failed" }
+    $FpocketLatest = Get-Content -Raw -LiteralPath $FpocketLatestPath | ConvertFrom-Json
+    $Consensus = Import-Csv -LiteralPath "results\consensus\${PdbId}_consensus_pockets.csv"
+    $Tier1 = @($Consensus | Where-Object { $_.support_count -eq "2" }).Count
+    $Tier2 = @($Consensus | Where-Object { $_.support_count -eq "3" }).Count
+    Write-Host "fpocket pockets: $($FpocketLatest.pocket_count)"
+    Write-Host "Tools completed: 3/3 (P2Rank + DoGSite3 + fpocket)" -ForegroundColor Green
+    Write-Host "Final consensus regions: $($Consensus.Count)"
+    Write-Host "T1 (support_count=2): $Tier1"
+    Write-Host "T2 (support_count=3): $Tier2" -ForegroundColor Green
+} else {
+    Write-Host "Tools completed: 2/3 (P2Rank + DoGSite3)" -ForegroundColor Yellow
+    Write-Host "Third tool fpocket: PENDING" -ForegroundColor Red
+    Write-Host "Final T1/T2 classification: NOT GENERATED" -ForegroundColor Red
+}
 Write-Host ""
 Write-Host "Correct pipeline:" -ForegroundColor Green
 Write-Host "$PdbId -> P2Rank / DoGSite3 / fpocket -> normalize pockets -> count tool support"
@@ -61,9 +76,14 @@ Write-Host "T2 = all $($Rules.tiers.T2.support_count) tools support the region"
 Write-Host ""
 Write-Host "The old 8YEZ-vs-8ZU3 comparison has been removed from this demo." -ForegroundColor Red
 Write-Host "Each of 8YEZ, 8ZU3, 8YFC and 9VMX must be analyzed independently." -ForegroundColor Yellow
-Write-Host "Current two-tool matching is only a progress check; it is not yet T1." -ForegroundColor Yellow
-Write-Host "Tier labels can be assigned only after fpocket finishes." -ForegroundColor Yellow
-Write-Host "Demo completed successfully. No final tiered pocket and no drug candidate are claimed." -ForegroundColor Green
+if (Test-Path -LiteralPath $FpocketLatestPath) {
+    Write-Host "This structure now has final computational T1/T2 pocket candidates." -ForegroundColor Green
+    Write-Host "These are predicted pockets, not experimentally validated binding sites or drug candidates." -ForegroundColor Yellow
+} else {
+    Write-Host "Current two-tool matching is only a progress check; it is not yet T1." -ForegroundColor Yellow
+    Write-Host "Tier labels can be assigned only after fpocket finishes." -ForegroundColor Yellow
+}
+Write-Host "Demo completed successfully. No drug candidate is claimed." -ForegroundColor Green
 if ($Pause) {
     Write-Host "Press Enter to close this window."
     [void](Read-Host)

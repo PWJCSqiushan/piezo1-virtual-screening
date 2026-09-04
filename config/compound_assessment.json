@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "status": "policy_locked_implementation_pending",
+  "input_unit": "one standardized compound with compound_id, canonical_smiles, source and upstream rank",
+  "preserve_raw_outputs": true,
+  "swissadme": {
+    "role": [
+      "physicochemical_properties",
+      "pharmacokinetic_estimates",
+      "druglikeness_filters",
+      "medicinal_chemistry_alerts"
+    ],
+    "hard_exclusion_rules": [],
+    "interpretation": "Drug-likeness or Lipinski Yes is a prioritization signal, not proof that a compound is orally deliverable, effective or safe. A No result must not automatically remove a compound from the COPD inhalation-review branch."
+  },
+  "admetlab3": {
+    "role": [
+      "broad_adme_profile",
+      "physicochemical_and_medicinal_chemistry_profile",
+      "prediction_uncertainty"
+    ],
+    "toxicity_columns_policy": "retain_raw_for_audit_but_do_not_use_as_the_team_primary_toxicity_decision"
+  },
+  "protox3": {
+    "role": "team_primary_in_silico_toxicity_screen",
+    "access": "academic_noncommercial_web_service_and_rate_limited_api",
+    "open_source_status": "not_assumed",
+    "interpretation": "prediction_only_not_experimental_safety_evidence"
+  },
+  "branches": {
+    "oral_priority": "compound meets selected oral-oriented heuristics; retain for ranking and expert review",
+    "inhalation_expert_review": "compound fails one or more oral-oriented heuristics; retain complete outputs for Zhang Dandan or another designated expert",
+    "general_expert_review": "conflicting, uncertain or out-of-domain predictions"
+  },
+  "inhalation_warning": "Inhalation suitability cannot be inferred from SwissADME drug-likeness alone. Formulation, aerosol/particle behavior, lung deposition, local availability, clearance, device and route-specific safety require separate expert assessment.",
+  "required_export_columns": [
+    "compound_id",
+    "canonical_smiles",
+    "source",
+    "upstream_rank",
+    "upstream_score",
+    "swissadme_raw_file",
+    "admetlab3_raw_file",
+    "protox3_raw_file",
+    "assessment_branch",
+    "review_status",
+    "reviewer",
+    "review_note"
+  ]
+}

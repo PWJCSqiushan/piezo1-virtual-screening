@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "tools": {
+    "p2rank": {
+      "version": "2.5.1",
+      "source_url": "https://github.com/rdk/p2rank/releases/download/2.5.1/p2rank_2.5.1.tar.gz",
+      "archive_sha256": "d243f2d9036ac053fefb9407b5fe1c85f4fe077c519fd975ac585e995feab274"
+    },
+    "dogsite3": {
+      "service_url": "https://proteins.plus/api/dogsite3_rest",
+      "mode": "remote_rest_api"
+    },
+    "drugclip": {
+      "repository": "https://github.com/bowen-gao/DrugCLIP",
+      "commit": "7a3a3fa33673f8668c811790f2e4681c98af44ef",
+      "archive_url": "https://codeload.github.com/bowen-gao/DrugCLIP/zip/7a3a3fa33673f8668c811790f2e4681c98af44ef",
+      "archive_sha256": "23e0cee57fcafd85c5d88ef929753c91f0c9dddcf80262bf1ce6180a95145057",
+      "source_code_license": "Apache-2.0",
+      "weights_and_outputs_license": "CC-BY-NC-4.0"
+    }
+  }
+}

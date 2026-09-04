@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "target": {
+    "gene": "PIEZO1",
+    "protein": "Piezo-type mechanosensitive ion channel component 1",
+    "organism": "Homo sapiens",
+    "uniprot": "Q92508"
+  },
+  "analysis_scope": {
+    "mode": "independent_per_conformation",
+    "active_pdb_ids": ["8YEZ", "8ZU3", "8YFC", "9VMX"],
+    "forbid_cross_conformation_consensus": true,
+    "reference_only": [
+      {
+        "pdb_id": "8ZU8",
+        "reason": "3.90 angstrom A1988V structure without MDFIC; screenshot marks it as unstable and reference-only"
+      }
+    ]
+  },
+  "structures": [
+    {
+      "pdb_id": "8YEZ",
+      "role": "primary_wt_without_mdfic",
+      "role_label": "primary_wt_without_mdfic",
+      "category": "wild_type",
+      "mutation_label": "none",
+      "conformation_label": "flat_wild_type_baseline",
+      "expected_resolution_angstrom": 3.30,
+      "auth_piezo1_chains": ["A", "B", "C"],
+      "auth_mdfic_chains": [],
+      "use_for_mvp": true,
+      "notes": "Human WT PIEZO1 cryo-EM structure; no MDFIC. Keep raw biological assembly and defer preprocessing decisions."
+    },
+    {
+      "pdb_id": "8ZU3",
+      "role": "secondary_wt_with_mdfic",
+      "role_label": "secondary_wt_with_mdfic",
+      "category": "wild_type",
+      "mutation_label": "none",
+      "conformation_label": "mdfic_curved_state",
+      "expected_resolution_angstrom": 3.10,
+      "auth_piezo1_chains": ["A", "B", "D"],
+      "auth_mdfic_chains": ["C", "E", "F"],
+      "use_for_mvp": true,
+      "notes": "Human WT PIEZO1-MDFIC cryo-EM complex. Preserve MDFIC in raw data; compare with and without MDFIC only after expert review."
+    },
+    {
+      "pdb_id": "8YFC",
+      "role": "a1988v_with_mdfic",
+      "role_label": "a1988v_with_mdfic",
+      "category": "mutant",
+      "mutation_label": "A1988V",
+      "conformation_label": "mdfic_a1988v_curved_state",
+      "expected_resolution_angstrom": 3.20,
+      "auth_piezo1_chains": ["A", "B", "D"],
+      "auth_mdfic_chains": ["C", "E", "F"],
+      "use_for_mvp": true,
+      "notes": "Human PIEZO1-A1988V-MDFIC cryo-EM structure. Analyze independently; never intersect pockets with another conformation."
+    },
+    {
+      "pdb_id": "9VMX",
+      "role": "e756del_with_mdfic",
+      "role_label": "e756del_with_mdfic",
+      "category": "mutant",
+      "mutation_label": "E756del",
+      "conformation_label": "mdfic_e756del_curved_state",
+      "expected_resolution_angstrom": 3.20,
+      "auth_piezo1_chains": ["A", "B", "D"],
+      "auth_mdfic_chains": ["C", "E", "F"],
+      "use_for_mvp": true,
+      "notes": "Human PIEZO1-E756del-MDFIC cryo-EM structure. Analyze independently; never intersect pockets with another conformation."
+    }
+  ]
+}

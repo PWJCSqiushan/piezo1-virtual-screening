@@ -15,6 +15,17 @@
       "commit": "7a3a3fa33673f8668c811790f2e4681c98af44ef",
       "archive_url": "https://codeload.github.com/bowen-gao/DrugCLIP/zip/7a3a3fa33673f8668c811790f2e4681c98af44ef",
       "archive_sha256": "23e0cee57fcafd85c5d88ef929753c91f0c9dddcf80262bf1ce6180a95145057",
+      "checkpoint_google_drive_id": "1i87thnbNk8qeLF_tLx_BzelTukWbHaTR",
+      "checkpoint_size_bytes": 1183713459,
+      "checkpoint_sha256": "dc2c76d0f02f9bb079a613f09d538dcda1bf9075f2952d91dc1bea55571f667e",
+      "unicore_commit": "44f6386f4dcd7137fc1e5d5e768117d635d64a26",
+      "runtime": {
+        "python": "3.10.21",
+        "pytorch": "2.7.1+cu128",
+        "rdkit": "2022.09.5",
+        "unicore": "0.0.1",
+        "reason": "PyTorch CUDA 12.8 is required for the local RTX 5060 Blackwell GPU; Uni-Core CUDA extensions are disabled"
+      },
       "source_code_license": "Apache-2.0",
       "weights_and_outputs_license": "CC-BY-NC-4.0"
     }

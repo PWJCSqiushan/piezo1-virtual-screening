@@ -16,7 +16,7 @@
 
 本仓库只产生候选分子和计算证据，不能把 AI、docking、MD 或 MM-GBSA 结果表述为已验证药物、激动剂/抑制剂或 COPD 治疗效果。
 
-## 当前阶段（2026-09-04）
+## 当前阶段（2026-09-06）
 
 - [x] 固化4个正式结构：8YEZ、8ZU3、8YFC、9VMX；8ZU8标记为仅参考
 - [x] 下载 PDB/mmCIF 和 RCSB API 元数据并记录 SHA256（RCSB 验证 PDF 链接返回 404，已作为非阻塞警告记录）
@@ -31,7 +31,9 @@
 
 分类规则以 `config/consensus_rules.json` 为准。尚未完成fpocket的结构，其P2Rank/DoGSite3双工具匹配只能称为预检查，不能提前标记T1。
 - [x] 固定 DrugCLIP 官方源码版本和许可证
-- [ ] DrugCLIP 官方示例烟雾测试（需要 Linux/WSL/HPC、checkpoint 和 Uni-Core 环境）
+- [x] 固定并校验 DrugCLIP checkpoint，建立 Python 3.10/CUDA 12.8/Uni-Core 隔离环境
+- [x] 跑通项目侧 DrugCLIP 小库冒烟测试：共识口袋/SMILES → LMDB → GPU检索 → 带归属的排名CSV
+- [ ] 选定正式候选分子库和需进入DrugCLIP的共识口袋；当前5分子结果仅为技术演示
 - [ ] GNINA 小规模 docking
 - [x] 固化 Step 8 数据分流政策：SwissADME/ADMETlab作综合早筛，ProTox作主要计算毒性筛查；保留所有原始输出
 - [ ] 候选分子产生后运行 Step 8，并导出供药学指导老师审核的全量表
@@ -88,6 +90,32 @@ python scripts/09_build_consensus.py --pdb-id 8YEZ --fpocket-output /path/to/8YE
 
 最终CSV/JSON位于`results/consensus/`，保留`support_count`、工具列表、原始口袋编号、中心、共同残基和来源文件。对其余三个PDB逐个重复以上命令，禁止把不同PDB放进同一次共识计算。
 
+## DrugCLIP 检索
+
+首次使用先安装隔离环境。安装器为本机 RTX 5060 使用 PyTorch 2.7.1 + CUDA 12.8，DrugCLIP 要求的 RDKit 固定为 2022.09.5；Uni-Core 固定到指定提交并禁用不兼容的旧 CUDA 扩展：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/bootstrap_drugclip_wsl.ps1
+```
+
+准备好包含 `compound_id,smiles` 的 CSV 后，对一个结构的一个共识口袋运行完整流程：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/drugclip_pipeline_wsl.ps1 `
+  -PdbId 8YEZ `
+  -ConsensusId C001 `
+  -Compounds examples/drugclip_demo_compounds.csv
+```
+
+流程会自动执行：
+
+1. 从所选结构的最终三工具共识表读取共同残基；
+2. 从同一 PDB 提取口袋原子，使用 RDKit 生成分子三维构象并写入两个 LMDB；
+3. 校验官方 checkpoint 的大小和 SHA256，使用 GPU 做 DrugCLIP 相似度排序；
+4. 输出带 `pdb_id`、`consensus_id`、`tier`、`compound_id` 和分数的 CSV。
+
+每次只允许一个结构的一个口袋进入一次检索，防止不同构象被混合，也防止多口袋取最大值后丢失口袋归属。`examples/drugclip_demo_compounds.csv` 仅用于检查代码，里面的常见小分子不是本项目筛出的药物候选。正式筛选前必须由团队确定分子库范围和口袋优先级。
+
 可选择演示任一已完成DoGSite3结果的结构：
 
 ```powershell
@@ -116,6 +144,8 @@ data/raw/structures/    PDB/mmCIF、RCSB API 和验证报告
 data/processed/         预处理结构与口袋文件
 docs/                   实施计划、决策和组会材料
 scripts/                一键入口
+compat/drugclip/         旧checkpoint的最小安全兼容白名单
+examples/                明确标记为技术演示的小型输入
 src/piezo_vs/           可复用 Python 代码
 tools/                  项目内便携工具
 runs/                   带时间戳的原始运行记录

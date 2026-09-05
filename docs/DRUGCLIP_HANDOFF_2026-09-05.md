@@ -1,8 +1,8 @@
-# DrugCLIP 阶段交接（2026-09-05）
+# DrugCLIP 实施状态（更新至 2026-09-06）
 
 ## 给队友的准确口径
 
-> DrugCLIP 官方源码和原始检索脚本已经固定到项目中，但项目自己的批量脚本尚未完成验收。目前已经确认了 PIEZO1 共识口袋到 DrugCLIP 输入所需的数据字段，并取得官方测试文件清单；下一步是完成环境、输入 LMDB 转换、官方样例冒烟测试和 CSV 排名导出。因此现在不能说“DrugCLIP 已经跑通并产出候选药物”。
+> DrugCLIP 项目脚本已经写好并完成两次端到端技术演示：可以把指定 PIEZO1 同结构共识口袋和 SMILES 分子表转换为 LMDB，调用官方权重在 RTX 5060 上检索，并导出带口袋归属的 CSV。当前只证明流程跑通，尚未选定正式分子库，演示排名不是候选药物结论。
 
 ## 已确认事项
 
@@ -14,24 +14,30 @@
   - `retrieval/mols.lmdb`：文件 ID `17OjIF7_HgDcC72m-nyLU26o5jcR9U801`
   - `retrieval/pocket.lmdb`：文件 ID `1CtpveHTBXCHnfcuIYoDkAAx1WXTJUJJF`
   - `checkpoint_best.pt`：文件 ID `1i87thnbNk8qeLF_tLx_BzelTukWbHaTR`，约 1.18 GB
-- 官方 `pocket.lmdb` 已下载至 `tools/drugclip/official/pocket.lmdb`（45,056 bytes）。
-- 官方 `mols.lmdb` 因 Google Drive 下载限流尚未取得。
-- checkpoint 下载已按用户关机要求中止；留下约 3.67 MB 的临时分片 `tools/drugclip/official/checkpoint_best.ptg22d9as9.part`，不是可用模型文件。
-- 本机 WSL `Ubuntu-fpocket` 可识别 RTX 5060 8 GB GPU；但 DrugCLIP/Uni-Core 旧依赖是否兼容仍需以官方样例实测为准。
+- 官方 checkpoint 已完整下载：1,183,713,459 bytes，SHA256 为 `dc2c76d0f02f9bb079a613f09d538dcda1bf9075f2952d91dc1bea55571f667e`。
+- 官方 `pocket.lmdb` 已下载至 `tools/drugclip/official/pocket.lmdb`（45,056 bytes）。官方演示 `mols.lmdb` 有约 4.68 GB，不是项目小库验证的必要条件，暂未继续下载。
+- WSL `Ubuntu-fpocket` 已建立 `/opt/drugclip-venv`：Python 3.10.21、PyTorch 2.7.1+cu128、RDKit 2022.09.5、Uni-Core 0.0.1。
+- RTX 5060 8 GB 的 CUDA 张量测试成功，设备能力为 12.0。
 - 项目 `results/consensus/*_consensus_pockets.csv` 已包含 DrugCLIP 口袋生成所需的构象 ID、共识编号、链、残基编号和中心坐标。无需人工 Excel 转录。
+- `8YEZ/C001`：19 个三工具共同残基、178 个口袋原子、5 个演示分子，端到端检索成功。
+- `8YEZ/C002`：20 个三工具共同残基、180 个口袋原子，一键总流程复测成功。
+- `8YEZ/C060`：3 个两工具共同残基、28 个口袋原子，T1 一键流程复测成功。
 
-## 尚未完成（恢复后按顺序执行）
+## 已实现脚本
 
-1. 在 WSL 中建立隔离的 DrugCLIP Python 环境，安装 PyTorch、RDKit、LMDB、Uni-Core 等依赖。
-2. 重新下载完整 `checkpoint_best.pt`，并取得官方 `mols.lmdb`；记录 SHA256。
-3. 用官方 `mols.lmdb + pocket.lmdb + checkpoint` 跑通一次官方 retrieval 冒烟测试。
-4. 编写项目输入转换脚本：
-   - 从 SMILES/分子表生成 DrugCLIP `mols.lmdb`；
-   - 从指定 PDB 和指定共识口袋残基生成 `pocket.lmdb`；
-   - 拒绝跨构象合并口袋。
-5. 编写项目运行封装：对 8YEZ、8ZU3、8YFC、9VMX 分别独立运行，保存命令、日志、版本、输入哈希和输出。
-6. 将 `ranked_compounds.txt` 规范化为 CSV，至少包含 `pdb_id`、`consensus_id`、`tier`、`rank`、`smiles`、`drugclip_score`。
-7. 添加小型测试和 README 使用说明；验证后再提交并推送 GitHub。
+- `scripts/10_prepare_drugclip_inputs.py`：共识口袋与分子表转 LMDB，记录输入/输出 SHA256。
+- `scripts/11_run_drugclip.py`：校验单口袋约束和官方 checkpoint 哈希，运行 DrugCLIP，保留日志与环境版本。
+- `scripts/12_normalize_drugclip_results.py`：把上游文本排名映射回分子 ID 并导出标准 CSV。
+- `scripts/drugclip_pipeline_wsl.ps1`：把以上三步合成一个 Windows 命令。
+- `scripts/bootstrap_drugclip_wsl.ps1`：建立固定版本的 WSL/GPU 运行环境。
+
+## 下一阶段待办
+
+1. 由医学/药学成员确定正式小分子库的来源、许可和筛选规模；演示分子不能直接沿用。
+2. 由团队确定各结构先跑哪些 T2/T1 共识口袋，避免对全部 483 个区域盲目全量计算。
+3. 对 8YEZ、8ZU3、8YFC、9VMX 分别独立运行正式 DrugCLIP 检索。
+4. 根据同一分子在不同结构/口袋中的排名形成稳健性表，再进入 GNINA 对接。
+5. 如比赛审计明确要求复现上游 retrieval 数据，再续传约 4.68 GB 的官方 `mols.lmdb`；它不阻塞项目侧脚本使用。
 
 ## 关键科学边界
 
@@ -45,7 +51,6 @@
 ```powershell
 Set-Location 'D:\丘山\F_大二上学期\R_生物竞赛\piezo1-vs'
 Get-Content .\docs\DRUGCLIP_HANDOFF_2026-09-05.md
-Get-ChildItem .\tools\drugclip\official -Force
+powershell -ExecutionPolicy Bypass -File .\scripts\drugclip_pipeline_wsl.ps1 -PdbId 8YEZ -ConsensusId C001 -Compounds .\examples\drugclip_demo_compounds.csv
 git status --short --branch
 ```
-

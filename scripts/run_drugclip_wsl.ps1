@@ -7,7 +7,8 @@ param(
     [Parameter(Mandatory = $true)][string]$Checkpoint,
     [Parameter(Mandatory = $true)][string]$OutputDir,
     [string]$DistroName = "Ubuntu-fpocket",
-    [int]$GpuId = 0
+    [int]$GpuId = 0,
+    [switch]$NoFp16
 )
 
 $ErrorActionPreference = "Stop"
@@ -43,5 +44,6 @@ $WslArguments = @(
     "--checkpoint", $CheckpointWsl, "--output-dir", $OutputWsl,
     "--gpu-id", $GpuId
 )
+if ($NoFp16) { $WslArguments += "--no-fp16" }
 & wsl.exe @WslArguments
 if ($LASTEXITCODE -ne 0) { throw "DrugCLIP retrieval failed. Inspect stdout.log/stderr.log in $OutputDir." }

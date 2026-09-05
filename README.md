@@ -1,168 +1,159 @@
 # PIEZO1 Virtual Screening
 
-第一届全球大学生生命科学挑战赛赛道三的可复现计算项目。当前目标是先完成最小闭环：
+面向第一届全球大学生生命科学挑战赛赛道三的可复现计算流程。仓库为每一步保留输入、版本、阈值、SHA256、原始输出和标准化结果，目标是产出**可追溯的候选数据**，而不是把计算预测包装成实验结论。
 
 ```text
-四个正式结构：8YEZ / 8ZU3 / 8YFC / 9VMX
-→ 每个结构分别用 DoGSite3 + fpocket + P2Rank 独立预测
-→ 只在同一个结构、同一个编号体系内统计每个区域的工具支持数
-→ 禁止跨构象求共同口袋
-→ 8ZU8仅保留为参考，不进入正式计算
-→ DrugCLIP 小库检索
-→ GNINA 小规模 docking
-→ SwissADME + ADMETlab 3.0 + ProTox 3.0 分层评估（非口服导向候选不自动删除）
-→ 仅对最终 1–3 个候选评估膜环境 MD / MM-GBSA
+4 个结构分别处理：8YEZ / 8ZU3 / 8YFC / 9VMX
+→ DoGSite3 + fpocket + P2Rank 独立预测口袋
+→ 同一结构内按空间距离和共同残基建立共识区域
+→ T1 = 恰好 2 个工具支持；T2 = 3 个工具支持
+→ 标准化口袋 → DrugCLIP 分子排序 → GNINA docking
+→ SwissADME / ADMETlab 3.0 / ProTox 3.0 无损汇总与专家分流
+→ 最终少量候选再评估膜环境 MD / MM-GBSA → 湿实验
 ```
 
-本仓库只产生候选分子和计算证据，不能把 AI、docking、MD 或 MM-GBSA 结果表述为已验证药物、激动剂/抑制剂或 COPD 治疗效果。
+> 科学边界：AI 排名、docking、MD 和 MM-GBSA 都只能生成候选与计算证据，不能证明分子已结合 PIEZO1、具有激动/抑制作用、能够治疗 COPD，或对人体安全有效。
 
-## 当前阶段（2026-09-06）
+## 现在能做什么
 
-- [x] 固化4个正式结构：8YEZ、8ZU3、8YFC、9VMX；8ZU8标记为仅参考
-- [x] 下载 PDB/mmCIF 和 RCSB API 元数据并记录 SHA256（RCSB 验证 PDF 链接返回 404，已作为非阻塞警告记录）
-- [x] 生成 `results/structure_manifest.csv`
-- [x] 本地跑通 P2Rank 2.5.1：8YEZ 112 个；8ZU3、8YFC、9VMX各121个候选口袋
-- [x] 跑通 DoGSite3 REST：8YEZ 112 个；8ZU3、8YFC、9VMX各100个候选口袋
-- [x] 生成4个结构的P2Rank/DoGSite3双工具预检查：18/20、19/20、19/20、19/20
-- [x] 实现跨平台P2Rank安装器、fpocket运行器和三工具同结构共识生成器，并通过合成测试
-- [x] 记录突变位点的坐标可见性：8YFC的A1988V位点未出现在当前原子坐标中；9VMX的删除变体不能仅凭ATOM记录直接验证
-- [x] 在独立WSL2环境编译安装fpocket 4.2.3，并跑通四个正式结构：294、246、246、246个fpocket候选口袋
-- [x] 分别生成四个结构的三工具最终共识：8YEZ为120个区域（T1=61、T2=59）；其余各121个（T1=64、T2=57）
+截至 2026-09-06，代码已经覆盖方案 2.0 的 Step 1–9 数据通路，并为 Step 8 提供可运行的导入/导出和专家复核队列；Step 10–12 仍依赖候选收敛、服务器、膜体系参数和实验条件。
 
-分类规则以 `config/consensus_rules.json` 为准。尚未完成fpocket的结构，其P2Rank/DoGSite3双工具匹配只能称为预检查，不能提前标记T1。
-- [x] 固定 DrugCLIP 官方源码版本和许可证
-- [x] 固定并校验 DrugCLIP checkpoint，建立 Python 3.10/CUDA 12.8/Uni-Core 隔离环境
-- [x] 跑通项目侧 DrugCLIP 小库冒烟测试：共识口袋/SMILES → LMDB → GPU检索 → 带归属的排名CSV
-- [ ] 选定正式候选分子库和需进入DrugCLIP的共识口袋；当前5分子结果仅为技术演示
-- [ ] GNINA 小规模 docking
-- [x] 固化 Step 8 数据分流政策：SwissADME/ADMETlab作综合早筛，ProTox作主要计算毒性筛查；保留所有原始输出
-- [ ] 候选分子产生后运行 Step 8，并导出供药学指导老师审核的全量表
-- [ ] 仅对最终 1-3 个候选评估 MD/MM-GBSA
+| 环节 | 当前状态 | 已有可核查输出 |
+|---|---|---|
+| 结构与元数据 | 已跑通 | 4 个正式结构、哈希、链、分辨率和突变坐标状态 |
+| 三工具口袋预测 | 已跑通 | P2Rank、DoGSite3、fpocket 原始结果与运行记录 |
+| 同结构共识 | 已跑通 | 严格三工具组合 + 不可扩展双工具组合；重叠假设另存审计表 |
+| 标准化口袋 | 已跑通 | 原始 PDB 坐标提取、残基/原子数、256 原子裁剪预警 |
+| DrugCLIP | 已跑通 | 固定源码和权重、LMDB、GPU 排名、来源链接、输入输出哈希 |
+| GNINA | 已跑通工程样例 | 固定二进制、受体/配体/搜索盒、SDF 姿势和标准化评分表 |
+| ADME/毒性 | 接口已实现，真实预测待跑 | 全候选保留、原始字段留存、非口服项进入吸入/制剂专家复核 |
+| 膜 MD / MM-GBSA | 待候选收敛 | 尚无可审计轨迹，不能宣称完成 |
+| 湿实验 | 团队外部实验环节 | 不属于本仓库计算完成范围 |
 
-本次组会的正式修订、科学纠错和PPT证据清单见 `docs/MEETING_DECISIONS_2026-09-01_PART2.md`。机器可读的Step 8策略见 `config/compound_assessment.json`。
+四个结构的当前三工具结果：
 
-## 快速开始
+| PDB | P2Rank | DoGSite3 | fpocket | 共识区域 | T1（2工具） | T2（3工具） |
+|---|---:|---:|---:|---:|---:|---:|
+| 8YEZ | 112 | 112 | 294 | 169 | 99 | 70 |
+| 8ZU3 | 121 | 100 | 246 | 147 | 74 | 73 |
+| 8YFC | 121 | 100 | 246 | 147 | 74 | 73 |
+| 9VMX | 121 | 100 | 246 | 147 | 74 | 73 |
 
-```bash
+“共识区域”不是把三张表逐行硬配。程序先枚举满足中心距离 `≤12 Å` 且共同残基 `≥3` 的严格三工具组合；只有无法扩展成三工具组合的双工具配对才可成为 T1。空间上重复的假设再按固定代表分组，同时保留完整假设表，避免贪心一对一算法把三工具区域误降级。结果同时写出 `min_pairwise_jaccard_similarity`（越接近 1 越相似）和 `max_pairwise_jaccard_distance`（越接近 0 越相似），避免把相似度与距离的方向说反。
+
+## 5 分钟本地演示
+
+克隆后先看不需要 GPU 的代码与口袋流程：
+
+```powershell
 git clone https://github.com/PWJCSqiushan/piezo1-virtual-screening.git
 cd piezo1-virtual-screening
-python -m venv .venv
+python -m unittest discover -s tests -v
+powershell -ExecutionPolicy Bypass -File scripts\demo.ps1 -PdbId 8YEZ
 ```
 
-Python核心代码只使用标准库。另需Java 17运行P2Rank；fpocket建议在Linux、WSL2或实验室HPC安装。
-
-```bash
-python scripts/01_fetch_structures.py
-python scripts/02_build_structure_manifest.py
-python scripts/bootstrap_p2rank.py
-python scripts/04_run_p2rank.py --pdb-id 8YEZ
-python scripts/03_run_dogsite3.py --pdb-id 8YEZ
-python scripts/05_match_pockets.py --pdb-id 8YEZ
-python scripts/08_verify_mvp.py --pdb-id 8YEZ
-```
-
-fpocket完成前可生成不带Tier的双工具预检查：
-
-```bash
-python scripts/09_build_consensus.py --pdb-id 8YEZ --allow-partial
-```
-
-在Linux/WSL/HPC安装[fpocket](https://github.com/Discngine/fpocket)后生成最终共识：
-
-```bash
-python scripts/run_fpocket.py --pdb-id 8YEZ
-python scripts/09_build_consensus.py --pdb-id 8YEZ
-```
-
-Windows 电脑可使用仓库内的一键 WSL 安装器。首次启用 WSL 后需要重启一次；重启后在 PowerShell 中运行：
+完整结果需要先生成或获得被 `.gitignore` 排除的大型运行数据。四个结构必须分别运行，禁止跨构象求共同口袋：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/bootstrap_fpocket_wsl.ps1 -PdbId 8YEZ
+python scripts\09_build_consensus.py --pdb-id 8YEZ
+python scripts\08_verify_mvp.py --pdb-id 8YEZ
 ```
 
-该脚本会校验 Ubuntu 24.04.4 官方镜像的 SHA-256，在隔离的 `Ubuntu-fpocket` 发行版中按官方依赖串行编译固定版本 fpocket 4.2.3（其内置 Qhull 构建规则不适合干净环境并行编译），随后运行 `8YEZ` 并生成三工具共识。Ubuntu 镜像和 WSL 虚拟磁盘位于被 Git 忽略的 `tools/wsl/`，不会上传到仓库。只安装、不运行结构时加 `-SkipRun`。
+### 可复现实例：PubChem 128 分子工程压力测试
 
-如果fpocket由另一台机器运行，可传入其完整输出目录：
-
-```bash
-python scripts/09_build_consensus.py --pdb-id 8YEZ --fpocket-output /path/to/8YEZ_out
-```
-
-最终CSV/JSON位于`results/consensus/`，保留`support_count`、工具列表、原始口袋编号、中心、共同残基和来源文件。对其余三个PDB逐个重复以上命令，禁止把不同PDB放进同一次共识计算。
-
-## DrugCLIP 检索
-
-首次使用先安装隔离环境。安装器为本机 RTX 5060 使用 PyTorch 2.7.1 + CUDA 12.8，DrugCLIP 要求的 RDKit 固定为 2022.09.5；Uni-Core 固定到指定提交并禁用不兼容的旧 CUDA 扩展：
+CID 1–128 是用于验证数据量、来源追踪和端到端输出的**顺序样本**，不是化学多样性库，也不是正式候选库。
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/bootstrap_drugclip_wsl.ps1
+python scripts\13_fetch_pubchem_smoke_library.py --start-cid 1 --count 128 `
+  --output runs\validation\pubchem_cid_1_128.csv
+
+powershell -ExecutionPolicy Bypass -File scripts\bootstrap_drugclip_wsl.ps1
+powershell -ExecutionPolicy Bypass -File scripts\drugclip_pipeline_wsl.ps1 `
+  -PdbId 8YEZ -ConsensusId C005 `
+  -Compounds runs\validation\pubchem_cid_1_128.csv
 ```
 
-准备好包含 `compound_id,smiles` 的 CSV 后，对一个结构的一个共识口袋运行完整流程：
+选择 C005 是因为它在当前 8YEZ 结果中由三个工具支持、属于 PIEZO1 范围，提取 18 个核心残基和 163 个原子，不触发 DrugCLIP 的 256 原子裁剪；它仍只是工程演示口袋，正式生物学优先级需要团队审核。
+
+主要输出：
+
+- `molecule_manifest.csv`：输入分子、规范 SMILES、PubChem CID/链接及拒绝原因；
+- `standardized_pocket.pdb`：从同一个 8YEZ 原始 PDB 提取的标准化口袋；
+- `input_run.json`：口袋、模型限制、随机种子和所有输入/输出哈希；
+- `ranked_compounds.csv`：每个分子的口袋归属、相对名次和 DrugCLIP 分数；
+- `report/index.html`：适合演示的自包含证据报告。
+
+DrugCLIP 分数只允许在**同一口袋、同一分子库、同一模型设置**内做相对排序；它不是结合自由能。
+
+同一 128 分子样本还可分别用 FP16/FP32 运行，再用 `scripts/19_compare_drugclip_runs.py` 输出 Spearman 排名相关系数和 Top-k 重合率；这是数值稳定性检查，不是生物学验证。
+
+### GNINA 小规模 docking
+
+首次运行会下载并校验固定的 GNINA 1.3.3 二进制，并在 Ubuntu 24.04 WSL 中安装官方 CUDA 12.8/cuDNN 9 运行库（总下载量约 4 GB）：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/drugclip_pipeline_wsl.ps1 `
-  -PdbId 8YEZ `
-  -ConsensusId C001 `
-  -Compounds examples/drugclip_demo_compounds.csv
+powershell -ExecutionPolicy Bypass -File scripts\bootstrap_gnina_wsl.ps1
+
+powershell -ExecutionPolicy Bypass -File scripts\gnina_pipeline_wsl.ps1 `
+  -PdbId 8YEZ -ConsensusId C005 `
+  -RankedCsv runs\drugclip\8YEZ\C005\<run-id>\ranked_compounds.csv `
+  -TopN 3 -Exhaustiveness 2 -NumModes 3
 ```
 
-流程会自动执行：
+程序会检查口袋范围、原子数、PDB/口袋归属、二进制大小与 SHA256；搜索盒超过 40 Å 时默认停止，不会静默裁剪。输出包含 `docked.sdf`、全部姿势表、每个分子的最佳姿势表、命令、版本和哈希。`CNNscore` 与 `minimizedAffinity` 是计算排序信号，不是实验结合证据。
 
-1. 从所选结构的最终三工具共识表读取共同残基；
-2. 从同一 PDB 提取口袋原子，使用 RDKit 生成分子三维构象并写入两个 LMDB；
-3. 校验官方 checkpoint 的大小和 SHA256，使用 GPU 做 DrugCLIP 相似度排序；
-4. 输出带 `pdb_id`、`consensus_id`、`tier`、`compound_id` 和分数的 CSV。
+### Step 8：ADME/毒性数据无损汇总
 
-每次只允许一个结构的一个口袋进入一次检索，防止不同构象被混合，也防止多口袋取最大值后丢失口袋归属。`examples/drugclip_demo_compounds.csv` 仅用于检查代码，里面的常见小分子不是本项目筛出的药物候选。正式筛选前必须由团队确定分子库范围和口袋优先级。
-
-可选择演示任一已完成DoGSite3结果的结构：
+先把 DrugCLIP 或 GNINA 结果转换为外部工具输入：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/demo.ps1 -PdbId 8YEZ
-powershell -ExecutionPolicy Bypass -File scripts/demo.ps1 -PdbId 8ZU3
-powershell -ExecutionPolicy Bypass -File scripts/demo.ps1 -PdbId 8YFC
-powershell -ExecutionPolicy Bypass -File scripts/demo.ps1 -PdbId 9VMX
+python scripts\17_prepare_compound_assessment.py `
+  --ranked-csv runs\drugclip\8YEZ\C005\<run-id>\ranked_compounds.csv `
+  --docking-csv runs\gnina\8YEZ\C005\<run-id>\best_poses.csv `
+  --top-n 20 --output-dir runs\assessment\<run-id>
 ```
 
-所有脚本默认从仓库根目录运行，也可从任意目录调用。原始下载放在 `data/raw/`，单次运行放在 `runs/`，标准化汇总放在 `results/`。
+从 SwissADME、ADMETlab 3.0、ProTox 3.0 导出 CSV 后再合并。必须明确指出哪个 SwissADME 列是团队选定的口服优先启发式：
 
-### 测试
+```powershell
+python scripts\18_merge_compound_assessment.py `
+  --master runs\assessment\<run-id>\compound_assessment_master.csv `
+  --swissadme <swissadme.csv> --admetlab3 <admetlab3.csv> --protox3 <protox3.csv> `
+  --oral-pass-column <exact-column-name> --output-dir runs\assessment_merged\<run-id>
+```
 
-```bash
+所有工具原始列都会带前缀保留。口服启发式为 `No` 的分子不会被删除，而会进入 `inhalation_expert_review`；缺失、冲突或无法识别的结果进入 `general_expert_review`。
+
+## 安装与数据说明
+
+- Python 核心测试只依赖标准库；分子准备和结果解析使用隔离 WSL 环境中的 RDKit。
+- P2Rank 需要 Java 17；fpocket 建议在 Linux/WSL2/HPC 使用。Windows 一键入口是 `scripts/bootstrap_fpocket_wsl.ps1`。
+- DrugCLIP 环境为 PyTorch 2.7.1 + CUDA 12.8、RDKit 2022.09.5 和固定 Uni-Core 提交；入口是 `scripts/bootstrap_drugclip_wsl.ps1`。
+- `data/`、`runs/`、`results/`、`tools/`、第三方源码和权重默认不进入 Git，新克隆不会自带大型结果。团队共享正式结果时应另行提供带哈希的归档。
+- 版本和下载地址见 `config/tool_sources.json`，第三方许可见 [docs/THIRD_PARTY.md](docs/THIRD_PARTY.md)。
+
+## 结构限制
+
+8YFC 和 9VMX 分别由条目元数据标识为 A1988V 与 E756del 变体，但当前 8ZU3、8YFC、9VMX 的 ATOM/HETATM 坐标记录相同；A1988V 位点也未解析进 8YFC 原子坐标。它们按团队要求分别进入流程，但重复口袋结果**不能**解释为突变特异性效应。`results/structure_manifest.csv` 会输出坐标哈希和 `mutation_coordinate_status` 供复核。
+
+## 质量门禁与目录
+
+```powershell
 python -m compileall -q src scripts tests
 python -m unittest discover -s tests -v
+python scripts\08_verify_mvp.py --pdb-id 8YEZ
 ```
-
-GitHub Actions会在push和Pull Request时自动执行语法、JSON配置和共识算法测试。
-
-## 目录
 
 ```text
-config/                 权威输入配置
-data/raw/structures/    PDB/mmCIF、RCSB API 和验证报告
-data/processed/         预处理结构与口袋文件
-docs/                   实施计划、决策和组会材料
-scripts/                一键入口
-compat/drugclip/         旧checkpoint的最小安全兼容白名单
-examples/                明确标记为技术演示的小型输入
-src/piezo_vs/           可复用 Python 代码
-tools/                  项目内便携工具
-runs/                   带时间戳的原始运行记录
-results/                标准化 CSV/JSON 结果
-tests/                  不依赖真实数据的轻量测试
+config/       权威结构、共识、评估和第三方版本配置
+scripts/      可重复执行的一键入口
+src/piezo_vs/ 可测试的解析、共识、报告、docking 和评估逻辑
+examples/     明确标记为技术演示的输入
+runs/         每次原始运行及日志（不进 Git）
+results/      标准化 CSV/JSON 结果（不进 Git）
+tests/        不依赖大型真实数据的快速回归测试
 ```
 
-## 可复现要求
+每次正式运行都应保留 UTC 时间、参数、输入/输出 SHA256、软件版本、标准输出/错误和失败记录。禁止手工修改原始结果后覆盖；算法修正应进入代码并生成新结果。
 
-每次运行都应保留输入文件 SHA256、软件版本、命令参数、UTC 时间、标准输出/错误和失败记录。禁止手工修改原始结果后覆盖；修正逻辑应进入脚本并生成新运行目录。
-
-大型结构、运行目录、结果、第三方源码和模型权重默认不会提交到Git。协作规范见[CONTRIBUTING.md](CONTRIBUTING.md)，第三方工具及许可证核对清单见[docs/THIRD_PARTY.md](docs/THIRD_PARTY.md)，当前可公开的工具状态见[docs/STATUS.md](docs/STATUS.md)。
-
-### 重要结构限制
-
-8YFC和9VMX分别由条目元数据标识为A1988V与E756del变体，但当前8ZU3、8YFC、9VMX的ATOM/HETATM坐标记录相同；其中A1988V位点也未解析进原子坐标。因此这些条目可以按团队要求进入独立流程，却不能被表述为已经观察到突变引起的局部口袋差异。`structure_manifest`会输出坐标哈希和`mutation_coordinate_status`供报告与人工复核。
-
-## 许可
-
-本仓库原创代码采用[MIT License](LICENSE)。下载的结构、远程服务结果、第三方软件和模型权重继续受各自来源的条款约束。
+原创代码采用 [MIT License](LICENSE)。第三方软件、模型权重、结构和服务结果继续受各自来源条款约束。

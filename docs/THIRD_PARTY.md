@@ -8,7 +8,7 @@
 | DoGSite3 / ProteinsPlus | 远程口袋预测 | https://proteins.plus/ | 受远程服务可用性和使用条款约束 |
 | fpocket 4.2.3 (`4bb0d844…`) | 几何口袋预测 | https://github.com/Discngine/fpocket | 已用`scripts/bootstrap_fpocket_wsl.ps1`在隔离WSL2环境从官方源码编译；MIT许可证 |
 | DrugCLIP | 口袋—小分子检索 | https://github.com/bowen-gao/DrugCLIP | 固定提交见配置；源码Apache-2.0，权重/输出CC-BY-NC-4.0；checkpoint仅本地保存，不进入Git |
-| GNINA | 分子对接 | https://github.com/gnina/gnina | 后续Gate使用 |
+| GNINA 1.3.3 | 分子对接 | https://github.com/gnina/gnina | 固定官方CUDA 12.8二进制、大小与SHA256；WSL需官方CUDA运行库和cuDNN 9 |
 | SwissADME | 理化/药物相似性早筛 | https://www.swissadme.ch/ | 预测不是实验结论 |
 | ADMETlab 3.0 | ADME与药化性质预测 | https://admetlab3.scbdd.com/ | 保存API参数、原始响应和不确定性 |
 | ProTox 3.0 | 计算毒性筛查 | https://tox.charite.de/protox3/ | 免费Web/API不等于平台源码开源 |

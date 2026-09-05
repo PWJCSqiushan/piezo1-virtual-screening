@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from piezo_vs.drugclip_io import parse_ranked_compounds
-from piezo_vs.io_utils import sha256_file, write_json
+from piezo_vs.io_utils import read_json, sha256_file, write_json
 
 
 def main() -> int:
@@ -20,10 +20,29 @@ def main() -> int:
     parser.add_argument("--pdb-id", required=True)
     parser.add_argument("--consensus-id", required=True)
     parser.add_argument("--tier", choices=("T1", "T2"), required=True)
+    parser.add_argument(
+        "--input-run",
+        type=Path,
+        required=True,
+        help="input_run.json from the matching DrugCLIP input preparation run",
+    )
     args = parser.parse_args()
 
     with args.manifest.open(encoding="utf-8-sig", newline="") as handle:
         manifest_rows = list(csv.DictReader(handle))
+    input_metadata = read_json(args.input_run)
+    expected = {
+        "pdb_id": args.pdb_id.upper(),
+        "consensus_id": args.consensus_id.upper(),
+        "tier": args.tier,
+    }
+    for key, value in expected.items():
+        if input_metadata.get(key) != value:
+            raise ValueError(
+                f"{args.input_run} has {key}={input_metadata.get(key)!r}; expected {value!r}"
+            )
+    if input_metadata.get("outputs", {}).get("molecule_manifest_sha256") != sha256_file(args.manifest):
+        raise ValueError("Molecule manifest SHA256 does not match input_run.json")
     by_smiles = {row["canonical_smiles"]: row for row in manifest_rows}
     ranked = parse_ranked_compounds(args.ranked)
     missing = sorted({smiles for smiles, _ in ranked if smiles not in by_smiles})
@@ -40,6 +59,9 @@ def main() -> int:
                 "rank": rank,
                 "compound_id": source["compound_id"],
                 "canonical_smiles": smiles,
+                "source": source.get("source", ""),
+                "source_id": source.get("source_id", ""),
+                "source_url": source.get("source_url", ""),
                 "drugclip_score": score,
                 "interpretation": "virtual_screening_rank_only_not_experimental_evidence",
             }
@@ -61,7 +83,11 @@ def main() -> int:
             "consensus_id": args.consensus_id.upper(),
             "tier": args.tier,
             "ranked_input_sha256": sha256_file(args.ranked),
+            "ranked_input_path": str(args.ranked.resolve()),
             "manifest_input_sha256": sha256_file(args.manifest),
+            "manifest_input_path": str(args.manifest.resolve()),
+            "input_run_sha256": sha256_file(args.input_run),
+            "input_run_path": str(args.input_run.resolve()),
             "output_sha256": sha256_file(args.output),
             "row_count": len(output_rows),
             "scientific_status": "computational_prediction_only",
@@ -73,4 +99,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

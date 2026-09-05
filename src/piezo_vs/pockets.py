@@ -168,13 +168,14 @@ def build_consensus_components(
             for right in component[index + 1 :]
         )
 
-    selected: list[list[Pocket]] = []
-    used: set[tuple[str, str, str]] = set()
     tool_names = sorted(by_tool)
 
     # A three-tool region is a strict clique: all three pairs must match and
-    # at least min_shared_residues must be shared by all three tools. This
-    # prevents transitive A-B-C chains from being mislabeled as 3-tool support.
+    # at least min_shared_residues must be shared by all three tools. Source
+    # pockets are allowed to participate in more than one hypothesis because
+    # a broad pocket from one tool may legitimately overlap multiple regions
+    # from another tool. Forcing one-to-one assignment would undercount tool
+    # support and can falsely label an extendable pair as exact two-tool support.
     triples: list[list[Pocket]] = []
     if len(tool_names) >= 3:
         for first in by_tool[tool_names[0]]:
@@ -199,15 +200,19 @@ def build_consensus_components(
             rank_sum(component),
         )
     )
+    unique_triples: list[list[Pocket]] = []
+    seen_components: set[frozenset[tuple[str, str, str]]] = set()
     for component in triples:
-        identities = {identity(pocket) for pocket in component}
-        if identities.isdisjoint(used):
-            selected.append(component)
-            used.update(identities)
+        identities = frozenset(identity(pocket) for pocket in component)
+        if identities not in seen_components:
+            unique_triples.append(component)
+            seen_components.add(identities)
+    triple_identity_sets = [
+        {identity(pocket) for pocket in component} for component in unique_triples
+    ]
 
-    # Generate exact two-tool regions only from pockets not already assigned
-    # to a strict three-tool region. The greedy order favors more shared
-    # residues, then smaller spatial distance, then better source ranks.
+    # A pair is exact two-tool support only when that same pair cannot be
+    # extended by any third-tool pocket into a strict three-tool clique.
     pairs: list[list[Pocket]] = []
     for left_index, left_tool in enumerate(tool_names):
         for right_tool in tool_names[left_index + 1 :]:
@@ -222,20 +227,86 @@ def build_consensus_components(
             rank_sum(component),
         )
     )
+    exact_pairs: list[list[Pocket]] = []
     for component in pairs:
         identities = {identity(pocket) for pocket in component}
-        if identities.isdisjoint(used):
-            selected.append(component)
-            used.update(identities)
+        if any(identities <= triple_identities for triple_identities in triple_identity_sets):
+            continue
+        frozen = frozenset(identities)
+        if frozen not in seen_components:
+            exact_pairs.append(component)
+            seen_components.add(frozen)
 
     return sorted(
-        selected,
+        [*unique_triples, *exact_pairs],
         key=lambda component: (
             -len(component),
             rank_sum(component),
             sorted((p.tool, p.pocket_id) for p in component),
         ),
     )
+
+
+def group_overlapping_consensus_components(
+    components: Iterable[list[Pocket]],
+    *,
+    max_center_distance: float = 12.0,
+    min_shared_residues: int = 3,
+) -> list[tuple[list[Pocket], list[list[Pocket]]]]:
+    """Group redundant clique hypotheses around a stable best representative.
+
+    Each candidate is a strict two- or three-tool clique. Candidates are sorted
+    by support strength and residue overlap, then compared only with the fixed
+    representative of each group. This avoids transitive chain merging while
+    retaining an audit list of every alternative hypothesis.
+    """
+
+    def core(component: list[Pocket]) -> set[Residue]:
+        return set.intersection(*(set(pocket.residues) for pocket in component))
+
+    def center(component: list[Pocket]) -> Point3D:
+        return tuple(
+            sum(pocket.center[axis] for pocket in component) / len(component)
+            for axis in range(3)
+        )
+
+    def spread(component: list[Pocket]) -> float:
+        return max(
+            (
+                center_distance(left.center, right.center)
+                for index, left in enumerate(component)
+                for right in component[index + 1 :]
+            ),
+            default=0.0,
+        )
+
+    def rank_sum(component: list[Pocket]) -> int:
+        return sum(pocket.rank or 10**9 for pocket in component)
+
+    ordered = sorted(
+        components,
+        key=lambda component: (
+            -len(component),
+            -len(core(component)),
+            spread(component),
+            rank_sum(component),
+            sorted((p.tool, p.pocket_id) for p in component),
+        ),
+    )
+    groups: list[tuple[list[Pocket], list[list[Pocket]]]] = []
+    for component in ordered:
+        component_core = core(component)
+        component_center = center(component)
+        for representative, members in groups:
+            if (
+                center_distance(component_center, center(representative)) <= max_center_distance
+                and len(component_core & core(representative)) >= min_shared_residues
+            ):
+                members.append(component)
+                break
+        else:
+            groups.append((component, [component]))
+    return groups
 
 
 def summarize_component(component: list[Pocket]) -> dict[str, object]:
@@ -254,6 +325,16 @@ def summarize_component(component: list[Pocket]) -> dict[str, object]:
         (center_distance(left.center, right.center) for i, left in enumerate(component) for right in component[i + 1 :]),
         default=0.0,
     )
+    pairwise_jaccard = []
+    for left_index, left_tool in enumerate(tools):
+        for right_tool in tools[left_index + 1 :]:
+            left_residues = tool_residues[left_tool]
+            right_residues = tool_residues[right_tool]
+            union = left_residues | right_residues
+            pairwise_jaccard.append(
+                len(left_residues & right_residues) / len(union) if union else 0.0
+            )
+    minimum_jaccard_similarity = min(pairwise_jaccard, default=0.0)
 
     def residue_text(residues: set[Residue]) -> str:
         return " ".join(f"{chain}_{number}" for chain, number in sorted(residues))
@@ -267,6 +348,8 @@ def summarize_component(component: list[Pocket]) -> dict[str, object]:
         "center_y": round(center[1], 3),
         "center_z": round(center[2], 3),
         "max_member_center_distance": round(max_spread, 3),
+        "min_pairwise_jaccard_similarity": round(minimum_jaccard_similarity, 6),
+        "max_pairwise_jaccard_distance": round(1.0 - minimum_jaccard_similarity, 6),
         "core_residue_count_2plus": len(core_two_plus),
         "core_residue_count_all_supporting_tools": len(core_all),
         "core_residues_2plus": residue_text(core_two_plus),

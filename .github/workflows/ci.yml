@@ -21,4 +21,5 @@ jobs:
           python -m json.tool config/structures.json >/dev/null
           python -m json.tool config/consensus_rules.json >/dev/null
           python -m json.tool config/compound_assessment.json >/dev/null
+          python -m json.tool config/tool_sources.json >/dev/null
           python -m unittest discover -s tests -v

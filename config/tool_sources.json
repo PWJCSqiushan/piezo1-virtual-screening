@@ -28,6 +28,26 @@
       },
       "source_code_license": "Apache-2.0",
       "weights_and_outputs_license": "CC-BY-NC-4.0"
+    },
+    "gnina": {
+      "version": "1.3.3",
+      "release_tag": "v1.3.3",
+      "repository": "https://github.com/gnina/gnina",
+      "binary_url": "https://github.com/gnina/gnina/releases/download/v1.3.3/gnina.cuda12.8.static",
+      "binary_size_bytes": 2056131000,
+      "binary_sha256": "3340c1f49cd3c7c84d8699182a1c6af13c7fa2a22448d1204640446106f72172",
+      "runtime": "Linux or WSL2 with CUDA 12.8 compatible NVIDIA GPU; cuDNN 9 and CUDA 12.8 runtime libraries required",
+      "ubuntu_2404_runtime_packages": [
+        "cudnn9-cuda-12",
+        "cuda-cudart-12-8",
+        "libcublas-12-8",
+        "libcusparse-12-8",
+        "libcufft-12-8",
+        "libcusolver-12-8",
+        "libnvjitlink-12-8",
+        "cuda-nvrtc-12-8"
+      ],
+      "license_note": "Upstream repository documents Apache-2.0 and GPL-2.0 licensing; prebuilt binary includes OpenBabel-linked functionality."
     }
   }
 }

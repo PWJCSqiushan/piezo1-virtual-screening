@@ -15,6 +15,7 @@ from piezo_vs.drugclip_io import (
     read_compound_inputs,
     select_consensus_row,
     write_lmdb_records,
+    write_pocket_pdb,
 )
 from piezo_vs.io_utils import read_json, sha256_file, write_json
 
@@ -67,6 +68,20 @@ def main() -> int:
     parser.add_argument("--compounds", type=Path, required=True, help="CSV/TSV/SMI with SMILES values")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument(
+        "--residue-policy",
+        choices=("two_plus", "all_supporting_tools"),
+        default="two_plus",
+        help=(
+            "Consensus residues used for the pocket. two_plus follows Step 4 (default); "
+            "all_supporting_tools is a stricter sensitivity-analysis option."
+        ),
+    )
+    parser.add_argument(
+        "--allow-non-piezo1-scope",
+        action="store_true",
+        help="Explicitly allow MDFIC-only or PIEZO1-MDFIC interface pockets after expert review.",
+    )
     args = parser.parse_args()
 
     pdb_id = args.pdb_id.upper()
@@ -80,8 +95,26 @@ def main() -> int:
     for required in (consensus_path, structure_path, args.compounds):
         if not required.is_file():
             raise FileNotFoundError(required)
-    row = select_consensus_row(consensus_path, pdb_id, consensus_id)
-    residue_field = "core_residues_all_supporting_tools"
+    tier_by_support = {
+        int(definition["support_count"]): tier for tier, definition in rules["tiers"].items()
+    }
+    row = select_consensus_row(
+        consensus_path,
+        pdb_id,
+        consensus_id,
+        tier_by_support=tier_by_support,
+        required_tools=set(rules["required_tools"]),
+    )
+    if row.get("pocket_scope") != "piezo1" and not args.allow_non_piezo1_scope:
+        raise ValueError(
+            f"{pdb_id}/{consensus_id} has pocket_scope={row.get('pocket_scope')!r}. "
+            "Only PIEZO1-only pockets enter DrugCLIP by default; use "
+            "--allow-non-piezo1-scope only after structural/medical review."
+        )
+    residue_field = {
+        "two_plus": "core_residues_2plus",
+        "all_supporting_tools": "core_residues_all_supporting_tools",
+    }[args.residue_policy]
     residues = parse_residue_tokens(row[residue_field])
     pocket_atoms, missing_residues = extract_pocket_atoms(structure_path, residues)
     if missing_residues:
@@ -131,6 +164,9 @@ def main() -> int:
                     "input_smiles": compound.smiles,
                     "canonical_smiles": canonical_smiles,
                     "source_row": compound.source_row,
+                    "source": compound.source,
+                    "source_id": compound.source_id,
+                    "source_url": compound.source_url,
                     "atom_count": len(record["atoms"]),
                 }
             )
@@ -145,6 +181,15 @@ def main() -> int:
             )
     if not molecule_records:
         raise ValueError("RDKit could not prepare any valid compounds")
+
+    pocket_pdb = output_dir / "standardized_pocket.pdb"
+    write_pocket_pdb(
+        pocket_pdb,
+        pocket_atoms,
+        pdb_id=pdb_id,
+        consensus_id=consensus_id,
+        support_count=int(row["support_count"]),
+    )
 
     try:
         import numpy as np
@@ -182,8 +227,11 @@ def main() -> int:
         "tools": row["tools"],
         "pocket_scope": row["pocket_scope"],
         "residue_source_field": residue_field,
+        "residue_policy": args.residue_policy,
         "residue_count": len(residues),
         "pocket_atom_count": len(pocket_atoms),
+        "model_max_pocket_atoms": 256,
+        "model_atom_crop_expected": len(pocket_atoms) > 256,
         "input_compound_count": len(compounds),
         "accepted_compound_count": len(molecule_records),
         "rejected_compound_count": len(rejected_rows),
@@ -201,6 +249,8 @@ def main() -> int:
             "mols_lmdb_sha256": sha256_file(mol_lmdb),
             "pocket_lmdb_sha256": sha256_file(pocket_lmdb),
             "molecule_manifest_sha256": sha256_file(manifest_path),
+            "standardized_pocket_pdb": str(pocket_pdb.relative_to(ROOT)),
+            "standardized_pocket_pdb_sha256": sha256_file(pocket_pdb),
         },
     }
     write_json(output_dir / "input_run.json", metadata)
@@ -215,4 +265,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

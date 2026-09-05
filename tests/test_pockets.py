@@ -12,6 +12,7 @@ from piezo_vs.pockets import (
     build_consensus_components,
     center_distance,
     classify_pocket_scope,
+    group_overlapping_consensus_components,
     summarize_component,
     validate_fpocket_output_name,
 )
@@ -68,6 +69,16 @@ class ConsensusTests(unittest.TestCase):
         self.assertTrue(components)
         self.assertTrue(all(summarize_component(component)["support_count"] == 2 for component in components))
 
+    def test_jaccard_similarity_and_distance_are_both_explicit(self) -> None:
+        first = {("A", "1"), ("A", "2"), ("A", "3"), ("A", "4")}
+        second = {("A", "1"), ("A", "2"), ("A", "3"), ("A", "5")}
+        summary = summarize_component([
+            self.pocket("p2rank", "p1", (0, 0, 0), first),
+            self.pocket("fpocket", "f1", (1, 0, 0), second),
+        ])
+        self.assertAlmostEqual(summary["min_pairwise_jaccard_similarity"], 0.6)
+        self.assertAlmostEqual(summary["max_pairwise_jaccard_distance"], 0.4)
+
     def test_three_pairs_without_triple_residue_overlap_is_not_support_three(self) -> None:
         ab = {("A", "1"), ("A", "2"), ("A", "3")}
         ac = {("A", "4"), ("A", "5"), ("A", "6")}
@@ -79,6 +90,41 @@ class ConsensusTests(unittest.TestCase):
         ]
         components = build_consensus_components(pockets)
         self.assertTrue(all(summarize_component(component)["support_count"] == 2 for component in components))
+
+    def test_pair_extendable_to_strict_triple_is_not_labeled_exact_two(self) -> None:
+        common = {("A", "1"), ("A", "2"), ("A", "3")}
+        pockets = [
+            self.pocket("p2rank", "p1", (0, 0, 0), common),
+            self.pocket("dogsite3", "d1", (1, 0, 0), common),
+            self.pocket("fpocket", "f1", (0, 1, 0), common),
+            self.pocket("dogsite3", "d2", (0, 2, 0), common | {("A", "4")}),
+        ]
+        components = build_consensus_components(pockets)
+        extendable_pair = {("p2rank", "p1"), ("dogsite3", "d1")}
+        pair_components = [
+            {(pocket.tool, pocket.pocket_id) for pocket in component}
+            for component in components
+            if len(component) == 2
+        ]
+        self.assertNotIn(extendable_pair, pair_components)
+        self.assertTrue(any(len(component) == 3 for component in components))
+
+    def test_overlapping_pair_is_grouped_under_stronger_triple(self) -> None:
+        common = {("A", "1"), ("A", "2"), ("A", "3")}
+        triple = [
+            self.pocket("p2rank", "p1", (0, 0, 0), common),
+            self.pocket("dogsite3", "d1", (1, 0, 0), common),
+            self.pocket("fpocket", "f1", (0, 1, 0), common),
+        ]
+        pair = [
+            self.pocket("p2rank", "p2", (1, 1, 0), common | {("A", "4")}),
+            self.pocket("dogsite3", "d2", (2, 1, 0), common | {("A", "5")}),
+        ]
+        groups = group_overlapping_consensus_components([pair, triple])
+        self.assertEqual(len(groups), 1)
+        representative, members = groups[0]
+        self.assertEqual(len(representative), 3)
+        self.assertEqual(len(members), 2)
 
     def test_fpocket_output_name_must_match_pdb(self) -> None:
         validate_fpocket_output_name("8YFC", Path("8YFC_out"))

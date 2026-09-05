@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "policy_locked_implementation_pending",
+  "status": "policy_locked_import_export_implemented_external_predictions_pending",
   "input_unit": "one standardized compound with compound_id, canonical_smiles, source and upstream rank",
   "preserve_raw_outputs": true,
   "swissadme": {

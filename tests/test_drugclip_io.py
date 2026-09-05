@@ -15,6 +15,7 @@ from piezo_vs.drugclip_io import (
     parse_residue_tokens,
     read_compound_inputs,
     select_consensus_row,
+    write_pocket_pdb,
 )
 
 
@@ -34,6 +35,9 @@ class DrugClipIoTests(unittest.TestCase):
                         "classification_status",
                         "support_count",
                         "tier",
+                        "member_count",
+                        "tools",
+                        "core_residues_2plus",
                     ],
                 )
                 writer.writeheader()
@@ -44,6 +48,9 @@ class DrugClipIoTests(unittest.TestCase):
                         "classification_status": "final_three_tool_run",
                         "support_count": "3",
                         "tier": "T2",
+                        "member_count": "3",
+                        "tools": "dogsite3,fpocket,p2rank",
+                        "core_residues_2plus": "A_1 A_2 A_3",
                     }
                 )
             self.assertEqual(select_consensus_row(path, "8yez", "c001")["tier"], "T2")
@@ -67,12 +74,46 @@ class DrugClipIoTests(unittest.TestCase):
             self.assertEqual([atom.atom_name for atom in atoms], ["CA"])
             self.assertFalse(missing)
 
+    def test_standardized_pocket_pdb_keeps_provenance_warning(self) -> None:
+        def atom_line() -> str:
+            return (
+                f"ATOM  {1:5d} {'CA':>4s} ALA {'A':1s}{10:4d}    "
+                f"{1.0:8.3f}{2.0:8.3f}{3.0:8.3f}{1.0:6.2f}{20.0:6.2f}          C "
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "pocket.pdb"
+            source = Path(directory) / "source.pdb"
+            source.write_text(atom_line() + "\n", encoding="ascii")
+            atoms, _ = extract_pocket_atoms(
+                source,
+                {("A", "10")},
+            )
+            write_pocket_pdb(path, atoms, pdb_id="8YEZ", consensus_id="C001", support_count=3)
+            text = path.read_text(encoding="ascii")
+            self.assertIn("SUPPORT_COUNT 3", text)
+            self.assertIn("NOT AN EXPERIMENTALLY VALIDATED BINDING SITE", text)
+
     def test_reads_csv_compounds(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "molecules.csv"
             path.write_text("compound_id,smiles\naspirin,CC(=O)OC1=CC=CC=C1C(=O)O\n", encoding="utf-8")
             compounds = read_compound_inputs(path)
             self.assertEqual(compounds[0].compound_id, "aspirin")
+
+    def test_preserves_compound_source_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "molecules.csv"
+            path.write_text(
+                "compound_id,smiles,source,source_id,source_url\n"
+                "pubchem_2244,CC(=O)OC1=CC=CC=C1C(=O)O,PubChem,CID:2244,"
+                "https://pubchem.ncbi.nlm.nih.gov/compound/2244\n",
+                encoding="utf-8",
+            )
+            compound = read_compound_inputs(path)[0]
+            self.assertEqual(compound.source, "PubChem")
+            self.assertEqual(compound.source_id, "CID:2244")
+            self.assertEqual(compound.source_url, "https://pubchem.ncbi.nlm.nih.gov/compound/2244")
 
     def test_parse_ranked_compounds(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -83,4 +124,3 @@ class DrugClipIoTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

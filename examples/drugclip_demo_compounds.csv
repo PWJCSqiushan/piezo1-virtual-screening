@@ -1,6 +1,6 @@
-compound_id,smiles
-demo_ethanol,CCO
-demo_caffeine,Cn1c(=O)c2c(ncn2C)n(C)c1=O
-demo_aspirin,CC(=O)Oc1ccccc1C(=O)O
-demo_acetaminophen,CC(=O)NC1=CC=C(C=C1)O
-demo_nicotine,CN1CCC[C@H]1c2cccnc2
+compound_id,smiles,source,source_id,source_url
+demo_ethanol,CCO,project_technical_demo,,
+demo_caffeine,Cn1c(=O)c2c(ncn2C)n(C)c1=O,project_technical_demo,,
+demo_aspirin,CC(=O)Oc1ccccc1C(=O)O,project_technical_demo,,
+demo_acetaminophen,CC(=O)NC1=CC=C(C=C1)O,project_technical_demo,,
+demo_nicotine,CN1CCC[C@H]1c2cccnc2,project_technical_demo,,

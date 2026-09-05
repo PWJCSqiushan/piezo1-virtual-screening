@@ -13,6 +13,9 @@ class CompoundInput:
     compound_id: str
     smiles: str
     source_row: int
+    source: str = ""
+    source_id: str = ""
+    source_url: str = ""
 
 
 @dataclass(frozen=True)
@@ -21,6 +24,7 @@ class PocketAtom:
     coordinate: tuple[float, float, float]
     chain: str
     residue_number: str
+    pdb_line: str = ""
 
 
 def parse_residue_tokens(text: str) -> set[tuple[str, str]]:
@@ -37,7 +41,14 @@ def parse_residue_tokens(text: str) -> set[tuple[str, str]]:
     return residues
 
 
-def select_consensus_row(path: Path, pdb_id: str, consensus_id: str) -> dict[str, str]:
+def select_consensus_row(
+    path: Path,
+    pdb_id: str,
+    consensus_id: str,
+    *,
+    tier_by_support: dict[int, str] | None = None,
+    required_tools: set[str] | None = None,
+) -> dict[str, str]:
     pdb_id = pdb_id.upper()
     consensus_id = consensus_id.upper()
     with path.open(encoding="utf-8-sig", newline="") as handle:
@@ -58,12 +69,23 @@ def select_consensus_row(path: Path, pdb_id: str, consensus_id: str) -> dict[str
     support_count = int(row.get("support_count") or 0)
     if support_count not in {2, 3}:
         raise ValueError(f"Unsupported consensus support_count={support_count}")
-    expected_tier = {2: "T1", 3: "T2"}[support_count]
+    expected_tier = (tier_by_support or {2: "T1", 3: "T2"})[support_count]
     if row.get("tier") != expected_tier:
         raise ValueError(
             f"Tier mismatch for {pdb_id}/{consensus_id}: support={support_count} "
             f"requires {expected_tier}, got {row.get('tier')!r}"
         )
+    if required_tools is not None:
+        row_tools = {tool.strip() for tool in row.get("tools", "").split(",") if tool.strip()}
+        if not row_tools <= required_tools or len(row_tools) != support_count:
+            raise ValueError(
+                f"Tool/support mismatch for {pdb_id}/{consensus_id}: tools={sorted(row_tools)}, "
+                f"support_count={support_count}, required={sorted(required_tools)}"
+            )
+    if int(row.get("member_count") or support_count) != support_count:
+        raise ValueError("Consensus member_count must equal support_count")
+    if not row.get("core_residues_2plus", row.get("core_residues_all_supporting_tools", "")):
+        raise ValueError("Consensus row has no core residues")
     return row
 
 
@@ -95,9 +117,33 @@ def extract_pocket_atoms(
             atom_name = line[12:16].strip()
             if not atom_name:
                 continue
-            atoms.append(PocketAtom(atom_name, coordinate, chain, residue_number))
+            atoms.append(PocketAtom(atom_name, coordinate, chain, residue_number, line.rstrip("\r\n")))
             found_residues.add(residue)
     return atoms, residues - found_residues
+
+
+def write_pocket_pdb(
+    path: Path,
+    atoms: list[PocketAtom],
+    *,
+    pdb_id: str,
+    consensus_id: str,
+    support_count: int,
+) -> None:
+    if path.exists():
+        raise FileExistsError(f"Refusing to overwrite {path}")
+    if not atoms or any(not atom.pdb_line for atom in atoms):
+        raise ValueError("Pocket PDB export requires original PDB lines for every atom")
+    lines = [
+        f"HEADER    PIEZO1 CONSENSUS POCKET {pdb_id.upper()} {consensus_id.upper()}",
+        f"REMARK 900 COMPUTATIONAL POCKET WITH SUPPORT_COUNT {support_count}",
+        "REMARK 900 COORDINATES COPIED FROM THE CONFIGURED SOURCE PDB",
+        "REMARK 900 NOT AN EXPERIMENTALLY VALIDATED BINDING SITE",
+        *(atom.pdb_line for atom in atoms),
+        "END",
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="ascii", errors="replace")
 
 
 def _header_lookup(fieldnames: Iterable[str | None]) -> dict[str, str]:
@@ -119,6 +165,12 @@ def read_compound_inputs(path: Path) -> list[CompoundInput]:
                 (lookup[key] for key in ("compound_id", "molecule_id", "id", "name") if key in lookup),
                 None,
             )
+            source_key = lookup.get("source")
+            source_id_key = next(
+                (lookup[key] for key in ("source_id", "pubchem_cid", "database_id") if key in lookup),
+                None,
+            )
+            source_url_key = lookup.get("source_url")
             if not smiles_key:
                 raise ValueError(f"{path} needs a SMILES/smi/canonical_smiles column")
             compounds = []
@@ -127,7 +179,16 @@ def read_compound_inputs(path: Path) -> list[CompoundInput]:
                 if not smiles:
                     continue
                 compound_id = (row.get(id_key) or "").strip() if id_key else ""
-                compounds.append(CompoundInput(compound_id or f"row_{row_number}", smiles, row_number))
+                compounds.append(
+                    CompoundInput(
+                        compound_id or f"row_{row_number}",
+                        smiles,
+                        row_number,
+                        (row.get(source_key) or "").strip() if source_key else "",
+                        (row.get(source_id_key) or "").strip() if source_id_key else "",
+                        (row.get(source_url_key) or "").strip() if source_url_key else "",
+                    )
+                )
             return compounds
 
     compounds: list[CompoundInput] = []
@@ -208,4 +269,3 @@ def parse_ranked_compounds(path: Path) -> list[tuple[str, float]]:
                 raise ValueError(f"Invalid DrugCLIP result at line {row_number}: {line!r}") from exc
             rows.append((smiles, score))
     return rows
-

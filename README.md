@@ -131,6 +131,7 @@ python scripts\18_merge_compound_assessment.py `
 - DrugCLIP 环境为 PyTorch 2.7.1 + CUDA 12.8、RDKit 2022.09.5 和固定 Uni-Core 提交；入口是 `scripts/bootstrap_drugclip_wsl.ps1`。
 - `data/`、`runs/`、`results/`、`tools/`、第三方源码和权重默认不进入 Git，新克隆不会自带大型结果。团队共享正式结果时应另行提供带哈希的归档。
 - 版本和下载地址见 `config/tool_sources.json`，第三方许可见 [docs/THIRD_PARTY.md](docs/THIRD_PARTY.md)。
+- 嘶，今天我啥也没干，哭了555
 
 ## 结构限制
 

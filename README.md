@@ -132,6 +132,7 @@ python scripts\18_merge_compound_assessment.py `
 - `data/`、`runs/`、`results/`、`tools/`、第三方源码和权重默认不进入 Git，新克隆不会自带大型结果。团队共享正式结果时应另行提供带哈希的归档。
 - 版本和下载地址见 `config/tool_sources.json`，第三方许可见 [docs/THIRD_PARTY.md](docs/THIRD_PARTY.md)。
 - 嘶，今天我啥也没干，哭了555
+- 啊，今天又啥也没干，55555
 
 ## 结构限制
 

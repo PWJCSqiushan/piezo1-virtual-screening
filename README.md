@@ -124,6 +124,19 @@ python scripts\18_merge_compound_assessment.py `
 
 所有工具原始列都会带前缀保留。口服启发式为 `No` 的分子不会被删除，而会进入 `inhalation_expert_review`；缺失、冲突或无法识别的结果进入 `general_expert_review`。
 
+## 正式 DrugCLIP 附件复核
+
+收到外部网页结果后，先运行审计，不要直接截取 Top20：
+
+    wsl.exe -d Ubuntu-fpocket -u root -- /opt/drugclip-venv/bin/python scripts/22_audit_formal_drugclip.py <附件目录> . --output-dir runs/formal_drugclip_audit/<run-id> --score-kind unknown
+
+审计会保留全部行并生成 audit_summary.json、task_audit.csv、molecule_review_flags.csv、normalized/、rerun_tasks.csv 和 evidence_request.md。只有明确证明网页分数是 z-score 时才允许使用 --score-kind zscore；否则不会套用大于 3 的阈值。
+
+同库结果比较：
+
+    python scripts/19_compare_drugclip_runs.py --first <C006.csv> --second <C007.csv> --top-k 20 --output <comparison.json>
+
+当 compound_id 集合不同，比较器返回 not_comparable 和退出码 2，不会计算误导性的 Spearman。每次审计与比较结果保存在 runs/ 下，不进入 Git。
 ## 安装与数据说明
 
 - Python 核心测试只依赖标准库；分子准备和结果解析使用隔离 WSL 环境中的 RDKit。

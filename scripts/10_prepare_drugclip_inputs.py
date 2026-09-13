@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,7 +40,10 @@ def generate_molecule_record(smiles: str, seed: int) -> tuple[dict[str, object],
     parameters.randomSeed = seed
     parameters.numThreads = 1
     if AllChem.EmbedMolecule(molecule, parameters) != 0:
-        raise ValueError("RDKit could not generate a 3D conformer")
+        parameters.useRandomCoords = True
+        parameters.randomSeed = seed
+        if AllChem.EmbedMolecule(molecule, parameters) != 0:
+            raise ValueError("RDKit could not generate a 3D conformer after deterministic random-coordinate fallback")
     try:
         if AllChem.MMFFHasAllMoleculeParams(molecule):
             AllChem.MMFFOptimizeMolecule(molecule, maxIters=500)
@@ -68,6 +72,7 @@ def main() -> int:
     parser.add_argument("--compounds", type=Path, required=True, help="CSV/TSV/SMI with SMILES values")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--shared-molecule-inputs", type=Path, help="Reuse a verified molecule LMDB and manifest from this exact compound input and seed")
     parser.add_argument(
         "--residue-policy",
         choices=("two_plus", "all_supporting_tools"),
@@ -141,46 +146,60 @@ def main() -> int:
     rejected_rows: list[dict[str, object]] = []
     seen_smiles: set[str] = set()
     rdkit_version = ""
-    for compound in compounds:
-        try:
-            record, rdkit_version = generate_molecule_record(compound.smiles, args.seed)
-            canonical_smiles = str(record["smi"])
-            if canonical_smiles in seen_smiles:
+    shared = args.shared_molecule_inputs
+    if shared:
+        previous = read_json(shared / "input_run.json")
+        if previous["source_files"]["compounds_sha256"] != sha256_file(args.compounds) or previous["seed"] != args.seed:
+            raise ValueError("Shared molecule input source or seed mismatch")
+        for filename, hash_key in (("mols.lmdb", "mols_lmdb_sha256"), ("molecule_manifest.csv", "molecule_manifest_sha256")):
+            if sha256_file(shared / filename) != previous["outputs"][hash_key]:
+                raise ValueError("Shared molecule input hash mismatch")
+        with (shared / "molecule_manifest.csv").open(encoding="utf-8-sig", newline="") as f:
+            manifest_rows = list(csv.DictReader(f))
+        with (shared / "rejected_compounds.csv").open(encoding="utf-8-sig", newline="") as f:
+            rejected_rows = list(csv.DictReader(f))
+        rdkit_version = previous["rdkit_version"]
+    else:
+        for compound in compounds:
+            try:
+                record, rdkit_version = generate_molecule_record(compound.smiles, args.seed)
+                canonical_smiles = str(record["smi"])
+                if canonical_smiles in seen_smiles:
+                    rejected_rows.append(
+                        {
+                            "compound_id": compound.compound_id,
+                            "input_smiles": compound.smiles,
+                            "source_row": compound.source_row,
+                            "reason": "duplicate_canonical_smiles",
+                        }
+                    )
+                    continue
+                seen_smiles.add(canonical_smiles)
+                molecule_records.append(record)
+                manifest_rows.append(
+                    {
+                        "lmdb_index": len(molecule_records) - 1,
+                        "compound_id": compound.compound_id,
+                        "input_smiles": compound.smiles,
+                        "canonical_smiles": canonical_smiles,
+                        "source_row": compound.source_row,
+                        "source": compound.source,
+                        "source_id": compound.source_id,
+                        "source_url": compound.source_url,
+                        "atom_count": len(record["atoms"]),
+                    }
+                )
+            except ValueError as exc:
                 rejected_rows.append(
                     {
                         "compound_id": compound.compound_id,
                         "input_smiles": compound.smiles,
                         "source_row": compound.source_row,
-                        "reason": "duplicate_canonical_smiles",
+                        "reason": str(exc),
                     }
                 )
-                continue
-            seen_smiles.add(canonical_smiles)
-            molecule_records.append(record)
-            manifest_rows.append(
-                {
-                    "lmdb_index": len(molecule_records) - 1,
-                    "compound_id": compound.compound_id,
-                    "input_smiles": compound.smiles,
-                    "canonical_smiles": canonical_smiles,
-                    "source_row": compound.source_row,
-                    "source": compound.source,
-                    "source_id": compound.source_id,
-                    "source_url": compound.source_url,
-                    "atom_count": len(record["atoms"]),
-                }
-            )
-        except ValueError as exc:
-            rejected_rows.append(
-                {
-                    "compound_id": compound.compound_id,
-                    "input_smiles": compound.smiles,
-                    "source_row": compound.source_row,
-                    "reason": str(exc),
-                }
-            )
-    if not molecule_records:
-        raise ValueError("RDKit could not prepare any valid compounds")
+        if not molecule_records:
+            raise ValueError("RDKit could not prepare any valid compounds")
 
     pocket_pdb = output_dir / "standardized_pocket.pdb"
     write_pocket_pdb(
@@ -202,7 +221,10 @@ def main() -> int:
     }
     mol_lmdb = output_dir / "mols.lmdb"
     pocket_lmdb = output_dir / "pocket.lmdb"
-    write_lmdb_records(mol_lmdb, molecule_records)
+    if shared:
+        shutil.copyfile(shared / "mols.lmdb", mol_lmdb)
+    else:
+        write_lmdb_records(mol_lmdb, molecule_records)
     write_lmdb_records(pocket_lmdb, [pocket_record])
 
     manifest_path = output_dir / "molecule_manifest.csv"
@@ -233,10 +255,12 @@ def main() -> int:
         "model_max_pocket_atoms": 256,
         "model_atom_crop_expected": len(pocket_atoms) > 256,
         "input_compound_count": len(compounds),
-        "accepted_compound_count": len(molecule_records),
+        "accepted_compound_count": len(manifest_rows),
         "rejected_compound_count": len(rejected_rows),
         "seed": args.seed,
         "rdkit_version": rdkit_version,
+        "shared_molecule_inputs": str(shared.resolve()) if shared else None,
+        "conformer_method": "ETKDGv3 with same-seed useRandomCoords fallback on failure; single thread; MMFF when available else UFF; maxIters=500; optimization convergence not enforced",
         "source_files": {
             "structure": str(structure_path.relative_to(ROOT)),
             "structure_sha256": sha256_file(structure_path),
@@ -256,7 +280,7 @@ def main() -> int:
     write_json(output_dir / "input_run.json", metadata)
     print(
         f"DRUGCLIP_INPUTS_OK pdb_id={pdb_id} consensus_id={consensus_id} tier={row['tier']} "
-        f"molecules={len(molecule_records)} rejected={len(rejected_rows)} "
+        f"molecules={len(manifest_rows)} rejected={len(rejected_rows)} "
         f"pocket_atoms={len(pocket_atoms)}"
     )
     print(output_dir)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import math
 import sys
 from pathlib import Path
 
@@ -48,6 +49,13 @@ def main() -> int:
     missing = sorted({smiles for smiles, _ in ranked if smiles not in by_smiles})
     if missing:
         raise ValueError(f"{len(missing)} ranked SMILES are absent from the molecule manifest")
+    if len(by_smiles) != len(manifest_rows) or len({r["compound_id"] for r in manifest_rows}) != len(manifest_rows):
+        raise ValueError("Duplicate molecule identity in manifest")
+    if len(ranked) != len(by_smiles) or {smiles for smiles, _ in ranked} != set(by_smiles):
+        raise ValueError("Ranked output must contain the complete manifest universe exactly once")
+    if any(not math.isfinite(score) for _, score in ranked):
+        raise ValueError("Nonfinite local DrugCLIP score")
+    ranked.sort(key=lambda pair: (-pair[1], by_smiles[pair[0]]["compound_id"]))
     output_rows = []
     for rank, (smiles, score) in enumerate(ranked, 1):
         source = by_smiles[smiles]
@@ -90,6 +98,7 @@ def main() -> int:
             "input_run_path": str(args.input_run.resolve()),
             "output_sha256": sha256_file(args.output),
             "row_count": len(output_rows),
+            "tie_break_rule": "descending score then ascending stable compound_id",
             "scientific_status": "computational_prediction_only",
         },
     )

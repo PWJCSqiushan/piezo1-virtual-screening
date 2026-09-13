@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import math
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,6 +25,13 @@ def read_ranks(path: Path) -> tuple[dict[str, int], dict[str, float]]:
             raise ValueError(f"Invalid or duplicate compound in {path}: {compound_id!r}")
         ranks[compound_id] = rank
         scores[compound_id] = float(row.get("drugclip_score", "nan"))
+    if set(ranks.values()) != set(range(1, len(ranks) + 1)):
+        raise ValueError("Ranks must be unique and contiguous")
+    ordered = sorted(scores, key=lambda cid: ranks[cid])
+    if any(not math.isfinite(value) for value in scores.values()):
+        raise ValueError("Nonfinite score")
+    if any(scores[a] < scores[b] for a, b in zip(ordered, ordered[1:])):
+        raise ValueError("Scores contradict ranks")
     return ranks, scores
 
 

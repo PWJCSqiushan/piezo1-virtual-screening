@@ -172,3 +172,16 @@ tests/        不依赖大型真实数据的快速回归测试
 每次正式运行都应保留 UTC 时间、参数、输入/输出 SHA256、软件版本、标准输出/错误和失败记录。禁止手工修改原始结果后覆盖；算法修正应进入代码并生成新结果。
 
 原创代码采用 [MIT License](LICENSE)。第三方软件、模型权重、结构和服务结果继续受各自来源条款约束。
+
+
+## Finite candidate pools and Step 8 gating
+
+A web-returned list is a finite exploratory pool, not a reproduction of a platform's entire library. Use `25_audit_candidate_handoff.py` to audit a ZIP without executing its contents, `28_rerank_candidate_pool.py` for a shared molecule universe, and `26_assess_select_candidates.py` for immutable assessment snapshots. Unknown web scores are not thresholded as z-scores.
+
+External CSV imports declare source hashes, identifier/SMILES columns, prediction types, allowed categorical values and original status columns. Source bytes and columns are retained. Missing/failed predictions, nonfinite scores, identity conflicts and stale reviews cannot qualify candidates. Approval is tied to assessment evidence. Oral-oriented rules do not imply suitability for another delivery route.
+
+Selection uses radius-2, 2048-bit chiral Morgan fingerprints and deterministic MaxMin Tanimoto distance on each direction's approved local top-50 pool. The first seed is the best rank; distance ties use rank and stable ID. Shortfalls remain partial.
+
+Formal GNINA inputs require `--candidate-list` and a matching selection manifest. Protein environment and pocket residue policy are separate; configured PIEZO1/MDFIC chains are preserved and HETATM treatment is reviewed separately. `27_run_first_gnina_batch.py` runs reviewed technical checks before site-specific batches. Missing ligands or damaged SDF records, including malformed trailing records, cannot yield success. Synthetic tests are engineering checks, not real docking or experimental validation.
+
+Use new output directories for each snapshot. Keep internal handoffs, meeting records, platform exports and real candidates outside public commits. Publish only source, tests, generic documentation and labeled demonstrations.

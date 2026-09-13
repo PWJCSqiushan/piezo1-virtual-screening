@@ -5,6 +5,7 @@ import csv
 import hashlib
 import json
 import math
+import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -106,6 +107,10 @@ def parse_hash_manifest(path: Path) -> dict[str, str]:
 
 
 def main() -> int:
+    if "--handoff-zip" in sys.argv:
+        import runpy
+        runpy.run_path(str(Path(__file__).with_name("25_audit_candidate_handoff.py")), run_name="__main__")
+        return 0
     parser = argparse.ArgumentParser(
         description="Audit a teammate DrugCLIP export without treating ranking as biological evidence."
     )
@@ -298,6 +303,10 @@ def main() -> int:
             "hard_blockers": hard_blockers,
             "current_gate": "blocked_before_gnina" if hard_blockers else "requires_manual_review",
         }
+        for check in ("ranks_are_exact_1_to_n", "scores_nonincreasing", "unique_compound_ids", "manifest_exactly_matches_ranked", "metadata_matches_task", "summary_matches_count", "summary_matches_top", "selection_matches_authoritative_consensus"):
+            if not info[check]: hard_blockers.append(check + "_failed")
+        if any(not math.isfinite(v) for v in scores): hard_blockers.append("nonfinite_score")
+        info["current_gate"] = "blocked_before_gnina" if hard_blockers else "requires_manual_review"
         tasks[task] = info
         task_rows.append({"task": task, **info})
         write_csv(normalized_dir / f"{task}_ranked_normalized.csv", normalized_rows)
@@ -328,13 +337,10 @@ def main() -> int:
         "scientific_status": "computational_prediction_only",
         "base": str(base),
         "output_dir": str(output_dir),
-        "overall_gate": "blocked_before_gnina",
-        "overall_blockers": [
-            "compound_library_provenance_not_independently_reproducible",
-            "web_score_definition_not_confirmed_as_zscore",
-            "8YEZ_C006_and_C007_used_different_compound_universes",
-            "C016_inputs_and_rankings_are_identical_across_three_structure_labels",
-        ],
+        "overall_gate": "blocked_before_gnina" if any(t["hard_blockers"] for t in tasks.values()) or missing_hash_targets or hash_failures else "requires_manual_review",
+        "overall_blockers": sorted({reason for t in tasks.values() for reason in t["hard_blockers"]} | ({"hash_manifest_failed"} if missing_hash_targets or hash_failures else set())),
+        "file_integrity": "failed" if missing_hash_targets or hash_failures else "passed",
+        "platform_pipeline_reproduction": "not_demonstrated",
         "score_semantics": {
             "declared_kind": args.score_kind,
             "metadata_sort_by": "similarity",
